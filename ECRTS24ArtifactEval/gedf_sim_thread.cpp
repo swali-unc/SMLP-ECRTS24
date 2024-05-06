@@ -8,6 +8,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#ifndef _MSC_VER
+#include <cstring>
+#endif
+
 using std::priority_queue;
 using std::vector;
 using std::deque;

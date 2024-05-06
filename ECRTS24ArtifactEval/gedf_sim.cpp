@@ -1,5 +1,7 @@
 #ifdef _MSC_VER
 #define _CRT_SECURE_NO_WARNINGS
+#else
+#include <cstring>
 #endif
 
 #include "gedf_sim.hpp"
