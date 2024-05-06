@@ -1,7 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <locale.h>
 
-#include "../libsmctrl/libsmctrl.h"
+#include "..libsmctrl/libsmctrl.h"
 
 #include <chrono>
 
@@ -77,8 +78,8 @@ int main(int argc, char* argv[]) {
 		auto startTime = std::chrono::high_resolution_clock::now();
 		vecAdd_cuda(a, b, c, n);
 		auto endTime = std::chrono::high_resolution_clock::now();
-		auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
-		printf("%d Partitions: %ldms\n", TOTAL_TPCs - i, ms);
+		auto ms = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime).count();
+		printf("%d Partitions: %ldus\n", TOTAL_TPCs - i, ms);
 		my_mask <<= 1;
 		my_mask |= 1;
 	}
