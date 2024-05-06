@@ -6,7 +6,14 @@
 #include <chrono>
 
 #define CUDALOOPS 5000
-#define TOTAL_TPCs 20
+constexpr int TOTAL_TPCs = 19; // 19 TPCs in our 3060 Ti
+
+// This macro determines on how many SMs our GPU kernel
+// will be optimal on. Each TPC contains 2 SMs in our 3060Ti
+// that means each partition can handle ~2048 parallel ops per cycle.
+// So if you divide OPTIMAL_WIDTH/2048 = 8, meaning this kernel
+// will be optimal on 8 SMs. Feel free to change this value.
+#define OPTIMAL_WIDTH 16384
 
 unsigned long long my_mask = 0;
 
@@ -52,7 +59,7 @@ void vecAdd_cuda(double* a, double* b, double* c, int n) {
 int main(int argc, char* argv[]) {
 	double* a, * b, * c;
 
-	int n = 10000;
+	int n = OPTIMAL_WIDTH;
 	size_t nBytes = n * sizeof(double);
 	a = (double*)malloc(nBytes);
 	b = (double*)malloc(nBytes);
@@ -63,12 +70,15 @@ int main(int argc, char* argv[]) {
 		b[i] = cos(i) * cos(i);
 	}
 
+	// First, we do a warmup kernel launch, because the first kernel takes an eternity
+	vecAdd_cuda(a, b, c, n);
+
 	for (int i = 0; i < TOTAL_TPCs; ++i) {
 		auto startTime = std::chrono::high_resolution_clock::now();
 		vecAdd_cuda(a, b, c, n);
 		auto endTime = std::chrono::high_resolution_clock::now();
 		auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
-		printf("%d- %dms\n", i + 1, ms);
+		printf("%d Partitions: %ldms\n", TOTAL_TPCs - i, ms);
 		my_mask <<= 1;
 		my_mask |= 1;
 	}
