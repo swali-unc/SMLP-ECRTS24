@@ -5,7 +5,6 @@
 #endif
 
 #include "gedf_sim.hpp"
-#include "util.hpp"
 
 #include <stdexcept>
 #include <iostream>
@@ -13,6 +12,7 @@
 #include <fstream>
 #include <numeric>
 #include <thread>
+#include <queue>
 
 using std::fstream;
 using std::uniform_real_distribution;
@@ -59,7 +59,6 @@ void gedf_sim::runSimulation(int tsIndex, double util, double Tmin, double Tmax)
 
 }
 
-static SpinLock reportLock;
 void gedf_sim::reportResult(simOutput* out) {
 	reportLock.lock();
 	results.push_back(new simOutput{out->H, out->M, out->Theta,
@@ -72,6 +71,8 @@ tuple<double,double> gedf_sim::generate_requests(unsigned int H) {
 	double LHmax = 0;
 	double Lmax = 0;
 	auto maxf = [](double a, double b) { return std::max(a, b); };
+	//std::priority_queue<double> amaxes;
+	//const unsigned int h = 1;
 
 	for (auto& i : tasks) {
 		if (i->r)
@@ -81,9 +82,28 @@ tuple<double,double> gedf_sim::generate_requests(unsigned int H) {
 			i->r = generate_request(i, H);
 			Lmax = std::accumulate(i->r->Li, i->r->Li + H + 1, Lmax, maxf);
 			LHmax = std::max(LHmax, i->r->Li[H]);
-		} else
+			/*double largestAmax = h * i->r->Li[h];
+			for (unsigned int j = h; j < H; ++j) {
+				if (j * i->r->Li[j] > largestAmax && (j == h || std::abs(i->r->Li[j] - i->r->Li[j - 1]) > 0.001))
+					largestAmax = j * i->r->Li[j];
+			}
+			amaxes.push(largestAmax);*/
+		}
+		else
 			i->r = nullptr;
 	}
+
+	/*std::vector<double> amaxvec;
+	for (unsigned int i = 0; i < M; ++i) {
+		amaxvec.push_back(amaxes.top());
+		amaxes.pop();
+	}
+	amaxes = std::priority_queue<double>();
+	double Bfq = 0;
+	for (unsigned int i = 0; i < M - 1; ++i)
+		Bfq += amaxvec[i];
+	Bfq = (Bfq / H) + Lmax;
+	threadsafe_printf("X= %f, 2M-1= %f (%f)\n", Bfq * 2, (2 * M - 1) * Lmax, (2 * M - 1) * LHmax);*/
 
 	return { Lmax, LHmax };
 }

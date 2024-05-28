@@ -65,6 +65,7 @@ void runFullSimulation(
 						delete i;
 					threads.clear();
 					sims.clear();
+					threadsafe_flushOutput();
 
 					taskIdx += PARALLEL_SETS;
 				}

@@ -151,7 +151,8 @@ void simData::doSim() {
 
 	It = H; // The number of SMs available at t=0.
 
-	double nextTarget = hyperperiod / 10;
+	//double nextTarget = hyperperiod / 10;
+	auto lowestCPU = getLowestPrioCPU();
 	for (double t = 0; t < hyperperiod; ) {
 		//printf("t: %f\n", t);
 		if (!events.size())
@@ -180,10 +181,10 @@ void simData::doSim() {
 		t = evnt->time; // Update the new time.
 		auto tDelta = t - tprev;
 
-		if (t > nextTarget) {
-			//threadsafe_printf("Simulation at time %f/%f\n", t, hyperperiod);
+		/*if (t > nextTarget) {
+			threadsafe_printf("Simulation at time %f/%f\n", t, hyperperiod);
 			nextTarget += hyperperiod / 10;
-		}
+		}*/
 
 		// Update all pi-blocking in this duration
 		// A request is pi-blocked if it is not running
@@ -192,7 +193,6 @@ void simData::doSim() {
 		//  This is because of property 7 in the paper. The only time
 		//  PI is applied is for a zero-length duration to complete a request.
 		// This makes simulation much easier.
-		auto lowestCPU = getLowestPrioCPU();
 		for (auto& i : reqFQ) {
 			if (!cpu[lowestCPU] || cpu[lowestCPU]->deadline < i->j->deadline)
 				i->piblockingtime += tDelta;

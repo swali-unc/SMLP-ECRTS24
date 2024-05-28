@@ -3,6 +3,7 @@
 #include <random>
 
 #include "task.hpp"
+#include "util.hpp"
 
 struct job {
 	double start; // The time at which the job started
@@ -83,6 +84,8 @@ private:
 
 	std::vector<task*> tasks;
 	std::vector<simOutput*> results;
+
+	SpinLock reportLock;
 };
 
 void sim_thread(gedf_sim* sim, unsigned int H, unsigned int M, double Theta, std::vector<task*>* taskSet, bool isSMLP, double hyperperiod);

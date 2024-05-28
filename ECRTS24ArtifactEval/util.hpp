@@ -22,3 +22,4 @@ void threadsafe_outputResult(
 
 void threadsafe_openOutputFile(const char* outFileName);
 void threadsafe_closeOutputFile();
+void threadsafe_flushOutput();

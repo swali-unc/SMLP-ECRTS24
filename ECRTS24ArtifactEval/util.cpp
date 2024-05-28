@@ -53,6 +53,13 @@ void threadsafe_outputResult(
 	fileOutLock.unlock();
 }
 
+void threadsafe_flushOutput() {
+	fileOutLock.lock();
+	if (fOut)
+		fflush(fOut);
+	fileOutLock.unlock();
+}
+
 void threadsafe_openOutputFile(const char* outFileName) {
 	fileOutLock.lock();
 	if (!fOut) {
