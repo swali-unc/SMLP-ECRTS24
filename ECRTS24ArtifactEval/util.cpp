@@ -9,6 +9,7 @@
 #include <stdlib.h>
 
 #if defined(_MSC_VER)
+// Not defined on Windows, so we recreate it here
 int vasprintf(char** strp, const char* fmt, va_list ap) {
 	int len = _vscprintf(fmt, ap);
 	if (len == -1) return -1;

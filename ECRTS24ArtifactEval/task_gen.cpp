@@ -35,6 +35,7 @@ void TaskGen::generateTaskSet() {
 	delete[] utils;
 }
 
+// This is given from the Emberson et. al. 2010 paper.
 double* TaskGen::generate_utilizations() {
 	double* r = new double[n];
 

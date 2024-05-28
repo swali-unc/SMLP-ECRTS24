@@ -4,6 +4,10 @@
 
 #include "task.hpp"
 
+/* Generates a task set with a target utilization U.
+ *  We use a technique from Emberson et. al. 2010, "Techniques for the synthesis of multiprocessor tasksets" WATERS'10
+ */
+
 class TaskGen {
 public:
 	TaskGen( unsigned int M, // number of processors guaranteed to component

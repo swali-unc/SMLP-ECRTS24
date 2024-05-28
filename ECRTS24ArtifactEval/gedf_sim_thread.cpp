@@ -12,6 +12,25 @@
 #include <cstring>
 #endif
 
+/* The actual simulation work is done in this file.
+ *  Threads of sim_thread are created, and they eventually run simData::doSim.
+ * 
+ * There are four types of events:
+ * RELEASE: A job has been released
+ * UNLOCK: A request has completed
+ * COMPLETE: A job has completed
+ * SLICE: A time-slice event has occurred
+ * 
+ * Note that the simulation is done in the context of "the current component."
+ *  This greatly simplifies the simulation as whatever is running on the CPU can
+ *  still be running when the component resumes, so if we treat "unscheduled time"
+ *  as a zero duration, then we don't have to preempt and reschedule every SLICE.
+ *  The most important thing, however, is that accelerators (satisfied requests),
+ *  that cannot be preempted, are not in-use when a SLICE event occurs.
+ * 
+ * If you want to simulate without time-slicing, set Theta to <=0.
+ */
+
 using std::priority_queue;
 using std::vector;
 using std::deque;
@@ -21,10 +40,10 @@ enum acttype {
 };
 
 struct act {
-	acttype type;
-	double time;
-	job* j;
-	request* r;
+	acttype type; // What was the event?
+	double time; // At what time?
+	job* j; // Associated job
+	request* r; // Associated request (if any)
 };
 
 // This let's us iterate through a priority queue
@@ -38,10 +57,16 @@ S& PQContainer(priority_queue<T, S, C>& q) {
 	return HackedQueue::Container(q);
 }
 
+// Compares two events (lower time is higher priority)
 bool cmpAct(const act* a, const act* b);
+
+// Compares two jobs (lower deadline is higher priority)
 bool cmpEDF(const job* a, const job* b);
+
+// Compares two requests (lower job deadline is higher priority)
 bool cmpReq(const request* a, const request* b);
 
+// This class contains all of the data that simulation methods need to access.
 class simData {
 public:
 	simData(unsigned int H, unsigned int M, double Theta, std::vector<task*>* taskSet, bool isSMLP, double hyperperiod)
@@ -91,11 +116,18 @@ private:
 	//  is satisfied, it pushes a completion event on the event queue
 	//  and that is how the job re-enters the ready queue.
 
+	// This function will find either schedule the job in the event on a CPU
+	//  or add it to the ready queue if the job does not have sufficient priority.
 	void jobReady(unsigned int& lowestCPU, act* evnt);
+
+	// Manually find the lowest priority job scheduled on the CPU.
+	//  If there is an idle CPU, then that is returned.
 	unsigned int getLowestPrioCPU();
 
+	// Runs the simulation
 	void doSim();
 
+	// Satisfies requests given the z function of the locking protocol.
 	void satisfy(zfunc z, double t);
 };
 
@@ -120,6 +152,7 @@ void simData::doSim() {
 
 	// Add all job releases to the event queue
 	for (auto& i : *taskSet) {
+		// Create all jobs for task i in the simulation time range [0, hyperperiod)
 		for (double t = 0; t < hyperperiod; t += i->period) {
 			auto j = new job{ t, i->cost, t + i->deadline, i->cost, -1, nullptr };
 			if (i->r) {
@@ -151,10 +184,8 @@ void simData::doSim() {
 
 	It = H; // The number of SMs available at t=0.
 
-	//double nextTarget = hyperperiod / 10;
 	auto lowestCPU = getLowestPrioCPU();
 	for (double t = 0; t < hyperperiod; ) {
-		//printf("t: %f\n", t);
 		if (!events.size())
 			break;
 		auto evnt = events.top();
@@ -180,11 +211,6 @@ void simData::doSim() {
 			events.pop();
 		t = evnt->time; // Update the new time.
 		auto tDelta = t - tprev;
-
-		/*if (t > nextTarget) {
-			threadsafe_printf("Simulation at time %f/%f\n", t, hyperperiod);
-			nextTarget += hyperperiod / 10;
-		}*/
 
 		// Update all pi-blocking in this duration
 		// A request is pi-blocked if it is not running
@@ -239,11 +265,11 @@ void simData::doSim() {
 			break;
 		case COMPLETE:
 			// A job is complete. Remove it from the CPU.
-			if (t > evnt->j->deadline)
+			if (t > evnt->j->deadline) // Did it miss deadline?
 				out.deadline_miss_count++;
-			if (readyQ.empty())
+			if (readyQ.empty()) // Are there any ready jobs to replace this one?
 				cpu[evnt->j->cpu] = nullptr;
-			else {
+			else { // If so, replace it with the highest priority job.
 				cpu[evnt->j->cpu] = readyQ.top();
 				cpu[evnt->j->cpu]->cpu = evnt->j->cpu;
 				readyQ.pop();
@@ -274,25 +300,27 @@ void simData::doSim() {
 	}
 
 	// Requests are deleted when jobs are deleted
-	//while (!reqFQ.empty())
-	//	reqFQ.pop_front();
 	reqFQ.clear();
 
-	//while (!reqPQ.empty())
-	//	reqPQ.pop();
+	// reqPQ deconstructor should clean up memory without needing
+	//  the deleted request data.
 }
 
+// Entire point of this method is to package the data in simData, get the output, and report it back to the parent.
 void sim_thread(gedf_sim* parent, unsigned int H, unsigned int M, double Theta, std::vector<task*>* taskSet, bool isSMLP, double hyperperiod) {
-	auto start = std::chrono::high_resolution_clock::now();
+	// If you are interested in how long it takes to run a simulation, uncomment the following lines.
+	
+	//auto start = std::chrono::high_resolution_clock::now();
 	simData sim(H, M, Theta, taskSet, isSMLP, hyperperiod);
 	auto out = sim.getOutput();
-	auto end = std::chrono::high_resolution_clock::now();
-	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+	//auto end = std::chrono::high_resolution_clock::now();
+	//auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
 	//threadsafe_printf("%s (%lldms): H: %d, M: %d, Theta: %f, Deadline misses: %d, Worst PI-block: %f\n", isSMLP ? "SMLP" : "OMLP", duration, out.H, out.M, out.Theta, out.deadline_miss_count, out.worst_piblock);
 	parent->reportResult(&out);
 }
 
+// Requests arrive at the PQ, which feeds into the FQ.
 void simData::satisfy(zfunc z, double t) {
 	// Idea: does the FQ contain less than M requests?
 	//  If so, move requests from the PQ to the FQ
@@ -322,7 +350,7 @@ void simData::satisfy(zfunc z, double t) {
 		// FZ-blocking when: t + Li >= nextSlice
 		auto SMs = z(reqFQ[i], It, H);
 		auto completeTime = reqFQ[i]->Li[SMs] + t;
-		if (completeTime < nextSlice) {
+		if (completeTime < nextSlice || nextSlice < 0) {
 			// satisfy this request
 			reqFQ[i]->SMcount = SMs;
 			It -= SMs;
@@ -348,10 +376,12 @@ void simData::satisfy(zfunc z, double t) {
 	}
 }
 
+// The OMLP always locks the entire GPU
 unsigned int z_omlp(request* r, unsigned int It, unsigned int H) {
 	return H;
 }
 
+// The SMLP locks the smallest allocation that can satisfy the request without causing additional execution time
 unsigned int z_smlp(request* r, unsigned int It, unsigned int H) {
 	unsigned int smallestAllocation = It;
 

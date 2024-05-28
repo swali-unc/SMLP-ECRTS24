@@ -31,32 +31,32 @@ int main(int argc, char* argv[]) {
 
 	// Generate a task set
 	char* outFileName = nullptr;
-	unsigned int M = 0;
+	unsigned int M = 0; // number of cores
 	double Tmin = -1; // periodmin
 	double Tmax = -1; // periodmax
-	unsigned int n = 0;
-	double U = -1;
+	unsigned int n = 0; // number of tasks in a task set
+	double U = -1; // utilization
 
 	// Simulate a task set
 	char* inFileName = nullptr;
-	unsigned int Hmin = 0;
+	unsigned int Hmin = 0; // Simulation carried out for H in [Hmin,Hmax] with step size Hstep
 	unsigned int Hmax = 0;
 	unsigned int Hstep = 0;
-	double thetaMin = -1; // thetamin
-	double thetaMax = -1; // thetamax
+	double thetaMin = -1; // Simulation carried out for Theta in [thetaMin,thetaMax] with step size Tstep
+	double thetaMax = -1;
 	double Tstep = -1;
-	double p = -1;
+	double p = -1; // Probability that a task is selected to issue a lock request
 
 	// Do both
 	std::vector<double> tminset;
 	std::vector<double> tmaxset;
-	double utilStart = -1;
+	double utilStart = -1; // Simulation carried out for U in [utilStart,utilEnd] with step size utilStep
 	double utilEnd = -1;
 	double utilStep = -1;
-	unsigned int Mmin = 0;
+	unsigned int Mmin = 0; // Simulation carried out for M in [Mmin,Mmax] with step size Mstep
 	unsigned int Mmax = 0;
 	unsigned int Mstep = 0;
-	unsigned int taskSets = 0;
+	unsigned int taskSets = 0; // Number of task sets to generate
 
 	// Populate the input parameters for task set generation
 	for (int i = 2; i + 1 < argc; i += 2) {

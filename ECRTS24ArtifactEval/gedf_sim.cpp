@@ -22,8 +22,10 @@ using std::tuple;
 using std::tie;
 
 void gedf_sim::runSimulation(int tsIndex, double util, double Tmin, double Tmax) {
+	// We simulate for one hyperperiod.
 	int hyperperiod = std::accumulate(tasks.begin(), tasks.end(), 1, [](int a, task* b) { return std::lcm(a, (int)b->period); });
 
+	// If this object also generated the task set, then parameter will be negative.
 	if (util < 0)
 		util = u;
 
@@ -35,7 +37,12 @@ void gedf_sim::runSimulation(int tsIndex, double util, double Tmin, double Tmax)
 
 		std::vector<std::thread> threads;
 
+		// For every value of Theta, create two threads. One uses the OMLP, the other uses the SMLP
 		for (double Theta = Thetamin; Theta <= Thetamax; Theta += Thetastep) {
+			// Note, if LHmax/Lmax > Theta, then these critical sections can never be satisfied.
+			//  As such, we skip those values. This could be optimized by ensuring requests are generated
+			//  to not exceed Theta. If you are unsure if you are running into this problem, uncomment
+			//  the output below.
 			if (LHmax > Theta)
 				;// threadsafe_printf("Warning: LHMax > Theta (%f > %f)\n", LHmax, Theta);
 			else if (Lmax > Theta)
@@ -68,42 +75,23 @@ void gedf_sim::reportResult(simOutput* out) {
 
 tuple<double,double> gedf_sim::generate_requests(unsigned int H) {
 	uniform_real_distribution<double> dist(0, 1);
-	double LHmax = 0;
-	double Lmax = 0;
+	double LHmax = 0; // The largest crit-sec length when given all H SMs
+	double Lmax = 0; // The largest crit-sec length, probably when given 1 SM
 	auto maxf = [](double a, double b) { return std::max(a, b); };
-	//std::priority_queue<double> amaxes;
-	//const unsigned int h = 1;
 
 	for (auto& i : tasks) {
 		if (i->r)
 			delete i->r;
 
+		// We have a p chance of this task issuing a request
 		if (dist(gen) < p) {
 			i->r = generate_request(i, H);
 			Lmax = std::accumulate(i->r->Li, i->r->Li + H + 1, Lmax, maxf);
 			LHmax = std::max(LHmax, i->r->Li[H]);
-			/*double largestAmax = h * i->r->Li[h];
-			for (unsigned int j = h; j < H; ++j) {
-				if (j * i->r->Li[j] > largestAmax && (j == h || std::abs(i->r->Li[j] - i->r->Li[j - 1]) > 0.001))
-					largestAmax = j * i->r->Li[j];
-			}
-			amaxes.push(largestAmax);*/
 		}
 		else
 			i->r = nullptr;
 	}
-
-	/*std::vector<double> amaxvec;
-	for (unsigned int i = 0; i < M; ++i) {
-		amaxvec.push_back(amaxes.top());
-		amaxes.pop();
-	}
-	amaxes = std::priority_queue<double>();
-	double Bfq = 0;
-	for (unsigned int i = 0; i < M - 1; ++i)
-		Bfq += amaxvec[i];
-	Bfq = (Bfq / H) + Lmax;
-	threadsafe_printf("X= %f, 2M-1= %f (%f)\n", Bfq * 2, (2 * M - 1) * Lmax, (2 * M - 1) * LHmax);*/
 
 	return { Lmax, LHmax };
 }

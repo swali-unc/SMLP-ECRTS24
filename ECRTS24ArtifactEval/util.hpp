@@ -1,6 +1,9 @@
 #pragma once
 #include <atomic>
 
+/* Some simple utility methods that ensure thread-safe output.
+ */
+
 class SpinLock {
 	std::atomic_flag locked = ATOMIC_FLAG_INIT;
 public:
